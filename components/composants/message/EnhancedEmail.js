@@ -19,7 +19,7 @@ import {
   Dimensions
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+// LinearGradient removed - using solid colors instead
 import { BlurView } from 'expo-blur';
 import {
   doc,
@@ -42,6 +42,11 @@ import { addNotification, NOTIFICATION_TYPES } from '../../utils/addNotification
 
 // IMPORT de votre fonction Gemini
 import { runLibraryBot } from '../../../gemini';
+
+// --- WebSocket Server URL ---
+const WS_URL = "ws://192.168.43.78:3000";
+
+
 
 const db = getFirestore();
 const HEIGHT = Dimensions.get('window').height;
@@ -88,6 +93,73 @@ const EnhancedEmail = ({ navigation }) => {
   useEffect(() => {
     setTimeout(() => setDatUserTest(false), 500);
   }, []);
+
+  //new
+const ws = useRef(null);
+
+useEffect(() => {
+  // Connect to WebSocket server
+  ws.current = new WebSocket(WS_URL);
+
+  ws.current.onopen = () => {
+    console.log("📡 Connected to WebSocket server");
+
+    // Identify current user to the server
+    if (datUser?.email) {
+      ws.current.send(JSON.stringify({
+        type: "IDENTIFY",
+        email: datUser.email
+      }));
+    }
+  };
+
+  ws.current.onmessage = (event) => {
+    console.log("📩 WebSocket message:", event.data);
+
+    const data = JSON.parse(event.data);
+
+    // If message comes from librarian/admin
+    if (data.type === "ADMIN_MESSAGE") {
+      receiveMessageFromWebSocket(data.message);
+    }
+  };
+
+  ws.current.onerror = (err) => {
+    console.log("❌ WebSocket error:", err.message);
+  };
+
+  ws.current.onclose = () => {
+    console.log("🔌 WebSocket disconnected");
+  };
+
+  return () => {
+    ws.current?.close();
+  };
+}, [datUser?.email]);
+
+async function receiveMessageFromWebSocket(text) {
+  if (!datUser?.email) return;
+
+  const userRef = doc(db, "BiblioUser", datUser.email);
+
+  const botMessageId = Date.now().toString();
+  try {
+    await updateDoc(userRef, {
+      messages: arrayUnion({
+        id: botMessageId,
+        "recue": "R",
+        "texte": text,
+        "heure": Timestamp.fromDate(new Date()),
+        "lu": false
+      })
+    });
+  } catch (e) {
+    console.log("Error saving WebSocket message:", e);
+  }
+}
+
+
+  //new
 
   // Fonctions Firebase
   function subscriber() {
@@ -178,6 +250,14 @@ const EnhancedEmail = ({ navigation }) => {
       });
 
       await res();
+                // Send message to WebSocket server
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({
+          type: "USER_MESSAGE",
+          email: datUser.email,
+          text: values.trim()
+        }));
+      }
 
       // 2. Réponse bot si activé
       if (botEnabled) {
@@ -197,6 +277,8 @@ const EnhancedEmail = ({ navigation }) => {
               "lu": false
             })
           });
+
+
 
           // Marquer comme lu après 1 seconde
           setTimeout(async () => {
@@ -401,12 +483,7 @@ const EnhancedEmail = ({ navigation }) => {
 
           {/* Header */}
           <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-            <LinearGradient
-                colors={['#FF6600', '#FFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.headerGradient}
-            >
+            <View style={styles.headerGradient}>
               <BlurView intensity={20} style={styles.headerContent}>
                 <View style={styles.adminAvatar}>
                   <MaterialIcons name="local-library" size={30} color="#fff" />
@@ -422,18 +499,18 @@ const EnhancedEmail = ({ navigation }) => {
                   <MaterialIcons
                       name="smart-toy"
                       size={20}
-                      color={botEnabled ? "#FFD700" : "#9CA3AF"}
+                      color={botEnabled ? "#FFD700" : "#6a6b6eff"}
                   />
                   <Switch
                       value={botEnabled}
                       onValueChange={setBotEnabled}
-                      trackColor={{ false: 'rgba(255, 255, 255, 0.3)', true: 'rgba(255, 215, 0, 0.5)' }}
+                      trackColor={{ false: 'rgba(255, 255, 255, 0.79)', true: 'rgba(255, 215, 0, 0.5)' }}
                       thumbColor={botEnabled ? '#FFD700' : '#9CA3AF'}
                       style={styles.switch}
                   />
                 </View>
               </BlurView>
-            </LinearGradient>
+            </View>
           </Animated.View>
 
           <KeyboardAvoidingView
@@ -475,12 +552,9 @@ const EnhancedEmail = ({ navigation }) => {
                           })
                       ) : (
                           <Animated.View style={[styles.welcomeContainer, { opacity: fadeAnim }]}>
-                            <LinearGradient
-                                colors={['#FF6600', '#FFF']}
-                                style={styles.welcomeIconContainer}
-                            >
+                            <View style={styles.welcomeIconContainer}>
                               <MaterialIcons name="local-library" size={40} color="#fff" />
-                            </LinearGradient>
+                            </View>
                             <Text style={styles.welcomeTitle}>Bienvenue dans le chat!</Text>
                             <Text style={styles.welcomeText}>
                               {botEnabled
@@ -514,7 +588,7 @@ const EnhancedEmail = ({ navigation }) => {
                 <TextInput
                     style={styles.messageInput}
                     placeholder="Écrivez votre message..."
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor="#000000ff"
                     onChangeText={(text) => {
                       setValues(text);
                       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -535,12 +609,9 @@ const EnhancedEmail = ({ navigation }) => {
                   {isLoading ? (
                       <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                      <LinearGradient
-                          colors={values.trim() ? ['#FF8A50', '#FF6B35'] : ['#ccc', '#aaa']}
-                          style={styles.sendButtonGradient}
-                      >
+                      <View style={[styles.sendButtonGradient, { backgroundColor: values.trim() ? '#FF8A50' : '#4c85e7ff' }]}>
                         <Ionicons name="send" size={20} color="#fff" />
-                      </LinearGradient>
+                      </View>
                   )}
                 </TouchableOpacity>
               </View>
@@ -560,11 +631,11 @@ const EnhancedEmail = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: { paddingHorizontal: 0, paddingVertical: 0, height: 120 },
-  headerGradient: { flex: 1, paddingTop: Platform.OS === 'ios' ? 50 : 30 },
+  headerGradient: { flex: 1, paddingTop: Platform.OS === 'ios' ? 50 : 30, backgroundColor: '#1F2937' },
   headerContent: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
   adminAvatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15, backgroundColor: 'rgba(255, 255, 255, 0.2)', justifyContent: 'center', alignItems: 'center' },
   headerTextContainer: { flex: 1 },
-  adminName: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  adminName: { fontSize: 18, fontWeight: 'bold', color: '#ffffffff' },
   adminStatus: { fontSize: 14, color: 'rgba(255, 255, 255, 0.8)', marginTop: 2 },
   botToggle: { flexDirection: 'row', alignItems: 'center' },
   switch: { marginLeft: 8, transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] },
@@ -574,7 +645,7 @@ const styles = StyleSheet.create({
   loadingContainer: { alignItems: 'center', paddingVertical: 50 },
   loadingText: { marginTop: 10, fontSize: 14, color: '#fff', fontStyle: 'italic' },
   welcomeContainer: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 30 },
-  welcomeIconContainer: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  welcomeIconContainer: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20, backgroundColor: '#FF8A50' },
   welcomeTitle: { fontSize: 24, fontWeight: '600', color: '#fff', marginBottom: 10, textAlign: 'center' },
   welcomeText: { fontSize: 16, color: '#B0B0B0', textAlign: 'center', lineHeight: 24 },
 
@@ -583,36 +654,36 @@ const styles = StyleSheet.create({
   sentMessage: { justifyContent: 'flex-end', paddingLeft: 50 },
   receivedMessage: { justifyContent: 'flex-start', paddingRight: 50 },
   messageContent: { maxWidth: '80%', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12 },
-  sentMessageContent: { backgroundColor: '#FF8A50', borderBottomRightRadius: 4 },
-  receivedMessageContent: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', borderBottomLeftRadius: 4 },
-  botMessageContent: { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(255, 255, 255, 0.3)' },
+  sentMessageContent: { backgroundColor: '#edededff', borderBottomRightRadius: 4, color:'#000' },
+  receivedMessageContent: { backgroundColor: 'rgba(0, 0, 0, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', borderBottomLeftRadius: 4 },
+  botMessageContent: { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(0, 0, 0, 0.3)' },
   messageText: { fontSize: 15, lineHeight: 20 },
-  sentMessageText: { color: '#fff' },
-  receivedMessageText: { color: '#fff' },
+  sentMessageText: { color: '#000000ff' },
+  receivedMessageText: { color: '#000000ff' },
   messageFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
   messageTime: { fontSize: 11 },
-  sentMessageTime: { color: 'rgba(255, 255, 255, 0.7)' },
-  receivedMessageTime: { color: 'rgba(255, 255, 255, 0.6)' },
+  sentMessageTime: { color: 'rgba(35, 34, 34, 0.7)' },
+  receivedMessageTime: { color: 'rgba(35, 34, 34, 0.7)' },
   messageStatus: { marginLeft: 5, justifyContent: 'center', alignItems: 'center' },
   doubleCheck: { flexDirection: 'row', alignItems: 'center', position: 'relative', width: 20, height: 16 },
   checkmark1: { position: 'absolute', left: 0 },
   checkmark2: { position: 'absolute', left: 4 },
 
   // Bot
-  botIndicator: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFE4D6', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5 },
+  botIndicator: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#646362ff', justifyContent: 'center', alignItems: 'center', marginRight: 8, marginBottom: 5 },
   botLoadingContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'flex-start', paddingRight: 50, marginVertical: 4 },
   botLoadingContent: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F9FF', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: '#B3E5FC', borderBottomLeftRadius: 4 },
   botLoadingText: { marginLeft: 10, fontSize: 14, color: '#6B7280', fontStyle: 'italic' },
-  botInfo: { fontSize: 11, color: 'rgba(255, 255, 255, 0.7)', textAlign: 'center', marginTop: 8 },
+  botInfo: { fontSize: 11, color: 'rgba(0, 0, 0, 0.7)', textAlign: 'center', marginTop: 8 },
 
   // Dates
   dateSeparatorContainer: { alignItems: 'center', marginVertical: 10 },
   dateSeparator: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
-  dateSeparatorText: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '500', textAlign: 'center' },
+  dateSeparatorText: { fontSize: 12, color: 'rgba(14, 13, 13, 0.8)', fontWeight: '500', textAlign: 'center' },
 
   // Input
   inputContainer: { paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' },
-  inputWrapper: { flexDirection: 'row', alignItems: 'flex-end', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
+  inputWrapper: { flexDirection: 'row', alignItems: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.1)', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
   messageInput: { flex: 1, maxHeight: 100, fontSize: 16, color: '#fff', paddingVertical: 5 },
   sendButton: { marginLeft: 10 },
   sendButtonGradient: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
