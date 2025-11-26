@@ -12,7 +12,7 @@ const firebaseConfig = {
   projectId: "biblio-cc84b",
   storageBucket: "biblio-cc84b.firebasestorage.app",
   messagingSenderId: "823617403574",
-  appId: "823617403574:web:e579c9bd1788f137c24417",
+  appId: "1:823617403574:web:e579c9bd1788f137c24417",
   measurementId: "G-PWEJXF3Q4M"
 };
 
@@ -24,6 +24,7 @@ let auth;
 try {
   auth = getAuth(app);
 } catch (error) {
+  console.log("Erreur lors de l'initialisation de l'authentification Firebase:", error);
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage)
   });
