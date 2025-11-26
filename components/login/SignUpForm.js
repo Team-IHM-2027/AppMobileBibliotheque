@@ -39,8 +39,9 @@ const SignUpForm = ({navigation}) => {
         const fetchDepartments = async () => {
             try {
                 setLoadingDepartments(true);
-                const departmentsCollection = collection(db, 'departements');
+                const departmentsCollection = collection(db, 'Departements');
                 const departmentsSnapshot = await getDocs(departmentsCollection);
+                console.log("Départements récupérés:", departmentsSnapshot.size);
 
                 // Construction du tableau de départements pour le Picker
                 let departmentsList = [{ label: "Sélectionner un département", value: "" }];

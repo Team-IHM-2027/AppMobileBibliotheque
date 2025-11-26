@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import NewNav from './components/navigation/NewNav';
 import { UserContextProvider } from './components/context/UserContext';
 import { FirebaseProvider } from './components/context/FirebaseContext';
+import { Ionicons } from '@expo/vector-icons'; // <-- import icons you use
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -13,6 +14,7 @@ export default function App() {
       try {
         await Font.loadAsync({
           'Georgia': require('./assets/fonts/Georgia.ttf'),
+          ...Ionicons.font, // <-- preload Ionicons fonts
         });
         setFontsLoaded(true);
       } catch (error) {
@@ -41,10 +43,7 @@ export default function App() {
   );
 }
 
- {/*<NavApp />*/}
-
- 
- const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',

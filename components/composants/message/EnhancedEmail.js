@@ -659,11 +659,11 @@ const styles = StyleSheet.create({
   botMessageContent: { backgroundColor: 'rgba(255, 255, 255, 0.15)', borderColor: 'rgba(0, 0, 0, 0.3)' },
   messageText: { fontSize: 15, lineHeight: 20 },
   sentMessageText: { color: '#000000ff' },
-  receivedMessageText: { color: '#000000ff' },
+  receivedMessageText: { color: '#ffffffff' },
   messageFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
   messageTime: { fontSize: 11 },
   sentMessageTime: { color: 'rgba(35, 34, 34, 0.7)' },
-  receivedMessageTime: { color: 'rgba(35, 34, 34, 0.7)' },
+  receivedMessageTime: { color: 'rgba(177, 173, 173, 0.7)' },
   messageStatus: { marginLeft: 5, justifyContent: 'center', alignItems: 'center' },
   doubleCheck: { flexDirection: 'row', alignItems: 'center', position: 'relative', width: 20, height: 16 },
   checkmark1: { position: 'absolute', left: 0 },
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
   // Dates
   dateSeparatorContainer: { alignItems: 'center', marginVertical: 10 },
   dateSeparator: { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
-  dateSeparatorText: { fontSize: 12, color: 'rgba(14, 13, 13, 0.8)', fontWeight: '500', textAlign: 'center' },
+  dateSeparatorText: { fontSize: 12, color: 'rgba(235, 226, 226, 0.8)', fontWeight: '500', textAlign: 'center' },
 
   // Input
   inputContainer: { paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.1)' },

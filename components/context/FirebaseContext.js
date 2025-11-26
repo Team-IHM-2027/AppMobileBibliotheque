@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, getFirebaseInstances } from '../../firebaseConfig';
+import { db } from '../../config';
 
 export const FirebaseContext = createContext({
   isFirebaseReady: false,
@@ -7,26 +7,10 @@ export const FirebaseContext = createContext({
 });
 
 export function FirebaseProvider({ children }) {
-  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
-  const [firestore, setFirestore] = useState(null);
-
-  useEffect(() => {
-    const initFirebase = async () => {
-      try {
-        const { db } = await getFirebaseInstances();
-        setFirestore(db);
-        setIsFirebaseReady(true);
-        console.log("Firebase initialisé avec succès dans le contexte");
-      } catch (error) {
-        console.error("Erreur lors de l'initialisation de Firebase dans le contexte:", error);
-      }
-    };
-
-    initFirebase();
-  }, []);
+  const [isFirebaseReady, setIsFirebaseReady] = useState(true);
 
   return (
-    <FirebaseContext.Provider value={{ isFirebaseReady, db: firestore }}>
+    <FirebaseContext.Provider value={{ isFirebaseReady, db }}>
       {children}
     </FirebaseContext.Provider>
   );
