@@ -179,7 +179,7 @@ const Produit = ({ route, navigation }) => {
       console.log(`Utilisation de l'emplacement etat${etatIndex}`);
 
       // Trouver le livre dans toutes les collections
-      const collections = ['BiblioGM', 'BiblioGE', 'BiblioGI', 'BiblioGT', 'BiblioInformatique'];
+      const collections = ['BiblioBooks'];
       let bookFound = false;
 
       for (const collectionName of collections) {
@@ -343,7 +343,7 @@ const Produit = ({ route, navigation }) => {
         }
       } else {
         // Si non trouvé dans la collection principale, chercher dans les autres
-        const otherCollections = ['BiblioGM', 'BiblioGE', 'BiblioGI', 'BiblioGT', 'BiblioInformatique']
+        const otherCollections = ['BiblioBooks']
           .filter(c => c !== primaryCollection);
 
         let found = false;
@@ -557,7 +557,7 @@ const Produit = ({ route, navigation }) => {
         bookFound = true;
       } else {
         // Si non trouvé, chercher dans toutes les collections
-        const collections = ['BiblioGM', 'BiblioGE', 'BiblioGI', 'BiblioGT', 'BiblioInformatique'];
+        const collections = ['BiblioBooks'];
 
         let bookFound = false;
         for (const collectionName of collections) {

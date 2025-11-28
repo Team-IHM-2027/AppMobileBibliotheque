@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../../config';
+import { db } from '../../firebaseConfig';
 import { UserContext } from '../context/UserContext';
 
 const { WIDTH, HEIGHT } = Dimensions.get('window');
@@ -67,7 +67,7 @@ const ELearningPage = ({ navigation }) => {
     };
 
     const loadLivres = async () => {
-        const livreCollections = ['BiblioInformatique', 'BiblioGE', 'BiblioGI', 'BiblioGM', 'BiblioGT'];
+        const livreCollections = ['BiblioBooks'];
         let allLivres = [];
 
         for (const collectionName of livreCollections) {

@@ -123,7 +123,7 @@ const VueUn = (props) => {
   // Fetch popular books
   const fetchPopularBooks = async () => {
     try {
-      const collections = ['BiblioGE', 'BiblioGI', 'BiblioGM', 'BiblioGT', 'BiblioInformatique'];
+      const collections = ['BiblioBooks'];
       let allBooks = [];
 
       for (const collectionName of collections) {

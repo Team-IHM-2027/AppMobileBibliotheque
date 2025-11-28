@@ -67,16 +67,16 @@ const BigRect = ({ salle, desc, etagere, exemplaire, image, name, cathegorie, da
     let collectionName = 'BiblioInformatique';
     switch (cathegorie) {
       case 'Genie Electrique':
-        collectionName = 'BiblioGE';
+        collectionName = 'BiblioBooks';
         break;
       case 'Genie Informatique':
-        collectionName = 'BiblioGI';
+        collectionName = 'BiblioBooks';
         break;
       case 'Genie Mecanique':
-        collectionName = 'BiblioGM';
+        collectionName = 'BiblioBooks';
         break;
       case 'Genie Telecom':
-        collectionName = 'BiblioGT';
+        collectionName = 'BiblioBooks';
         break;
     }
 

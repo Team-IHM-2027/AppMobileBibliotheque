@@ -74,7 +74,7 @@ const Cathegorie = ({ route, navigation }) => {
           console.log('Chargement des livres pour la catégorie:', cathegorie);
 
           // Charger depuis toutes les collections pertinentes
-          const collections = ['BiblioInformatique', 'BiblioGE', 'BiblioGI', 'BiblioGM', 'BiblioGT'];
+          const collections = ['BiblioBooks'];
 
           for (const collectionName of collections) {
             try {
