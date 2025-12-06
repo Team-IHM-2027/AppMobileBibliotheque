@@ -15,6 +15,7 @@
     "@firebase/firestore": "^4.4.1",
     "@firebase/firestore-compat": "^0.3.24",
     "@firebase/storage": "^0.10.0",
+    "@google/genai": "^1.31.0",
     "@google/generative-ai": "^0.24.1",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/masked-view": "^0.1.11",

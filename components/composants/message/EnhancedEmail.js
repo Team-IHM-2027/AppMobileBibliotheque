@@ -266,6 +266,7 @@ async function receiveMessageFromWebSocket(text) {
         try {
           const conversationHistory = datUser.messages || [];
           const botResponse = await runLibraryBot(values.trim(), conversationHistory);
+          console.log('Réponse bot Gemini:', botResponse);
 
           const botMessageId = (dt.nanoseconds + 1).toString();
           await updateDoc(washingtonRef, {

@@ -16,7 +16,7 @@ const HEIGHT = Dimensions.get('window').height;
 
 // Fonction pour normaliser les chaînes (supprimer les accents)
 const normalizeString = (str) => {
-  if (!str) return ''; // Retourner une chaîne vide si str est undefined ou null
+  if (!str) return '';
   return str.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, " ")
@@ -24,22 +24,14 @@ const normalizeString = (str) => {
 };
 
 const Produit = ({ route, navigation }) => {
-  // Extraire uniquement les données nécessaires de route.params
   const { salle, desc, etagere, exemplaire, image, name, cathegorie, commentaire, nomBD, type: bookType } = route.params || {};
-
-  // Normaliser le nom du livre pour la recherche avec vérification
   const normalizedName = name ? normalizeString(name) : '';
-
-  // Utiliser le contexte pour accéder à datUser au lieu des params
   const { currentUserdata } = useContext(UserContextNavApp);
   const { isFirebaseReady, db } = useFirebase();
-
-  // Définir une valeur par défaut pour le type
   const type = bookType || cathegorie;
-
   const TITRE = name || '';
+  
   const [dt, setDt] = useState(Timestamp.now());
-
   const [modalDescription, setModalDescription] = useState(false);
   const [modalComm, setModalComm] = useState(false);
   const [values, setValues] = useState("");
@@ -47,7 +39,7 @@ const Produit = ({ route, navigation }) => {
   const [showAllComments, setShowAllComments] = useState(false);
   const [nomUser, setNomUser] = useState('');
   const [dat, setDat] = useState(0);
-  const [comment, setComment] = useState(commentaire || []);
+  const [comment, setComment] = useState(Array.isArray(commentaire) ? commentaire : []);
   const [datd, setDatd] = useState();
   const [mes, setMes] = useState();
   const [data, setData] = useState([]);
@@ -55,10 +47,9 @@ const Produit = ({ route, navigation }) => {
   const [bookDescription, setBookDescription] = useState(desc || '');
   const [similarBooks, setSimilarBooks] = useState([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
-
   const [currentExemplaire, setCurrentExemplaire] = useState(exemplaire);
   const [isReserving, setIsReserving] = useState(false);
-
+  const [expandedComments, setExpandedComments] = useState({});
 
   const ajouterRecent = async () => {
     if (!currentUserdata?.email) {
@@ -73,24 +64,16 @@ const Produit = ({ route, navigation }) => {
     setIsReserving(true);
 
     try {
-      // Vérifier que toutes les données nécessaires sont présentes
       if (!name || !cathegorie) {
         console.error('Données manquantes:', { name, cathegorie, type });
         Alert.alert('Erreur', 'Données du livre incomplètes');
         return;
       }
 
-      console.log('Tentative de réservation:', {
-        name: name,
-        normalized: normalizedName,
-        cathegorie: cathegorie
-      });
-
       const userRef = doc(db, "BiblioUser", currentUserdata.email);
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        // Créer le document utilisateur s'il n'existe pas
         await setDoc(userRef, {
           email: currentUserdata.email,
           tabMessages: [],
@@ -107,40 +90,16 @@ const Produit = ({ route, navigation }) => {
       }
 
       const userData = userDoc.data() || {};
-
-      // DEBUG: Afficher l'état actuel de tous les emplacements
-      console.log('État actuel des emplacements:');
-      console.log('etat1:', userData.etat1, 'tabEtat1:', userData.tabEtat1);
-      console.log('etat2:', userData.etat2, 'tabEtat2:', userData.tabEtat2);
-      console.log('etat3:', userData.etat3, 'tabEtat3:', userData.tabEtat3);
-
-      // Vérifier le nombre de réservations actives (maximum 3)
-      const activeReservations = [
-        userData.etat1,
-        userData.etat2,
-        userData.etat3
-      ].filter(etat => etat === 'reserv').length;
-
-      console.log('Nombre de réservations actives:', activeReservations);
+      const activeReservations = [userData.etat1, userData.etat2, userData.etat3].filter(etat => etat === 'reserv').length;
 
       if (activeReservations >= 3) {
-        Alert.alert('Limite atteinte', 'Vous avez déjà 3 réservations actives. Veuillez attendre que certaines soient traitées avant d\'en faire de nouvelles.');
+        Alert.alert('Limite atteinte', 'Vous avez déjà 3 réservations actives.');
         return;
       }
 
-      // Vérifier si le livre est déjà réservé par l'utilisateur
-      const isAlreadyReserved = [
-        userData.tabEtat1,
-        userData.tabEtat2,
-        userData.tabEtat3
-      ].some(tabEtat => {
+      const isAlreadyReserved = [userData.tabEtat1, userData.tabEtat2, userData.tabEtat3].some(tabEtat => {
         if (Array.isArray(tabEtat) && tabEtat.length > 0) {
-          const bookName = tabEtat[0];
-          const isReserved = normalizeString(bookName) === normalizedName;
-          if (isReserved) {
-            console.log('Livre déjà réservé:', bookName);
-          }
-          return isReserved;
+          return normalizeString(tabEtat[0]) === normalizedName;
         }
         return false;
       });
@@ -150,35 +109,20 @@ const Produit = ({ route, navigation }) => {
         return;
       }
 
-      // Trouver un emplacement libre (etat1, etat2, ou etat3)
       let etatIndex = -1;
       for (let i = 1; i <= 3; i++) {
         const etatValue = userData[`etat${i}`];
-        console.log(`Vérification etat${i}:`, etatValue);
-
-        // Considérer comme libre si la valeur est 'ras', undefined, null, ou une chaîne vide
         if (!etatValue || etatValue === 'ras' || etatValue === '') {
           etatIndex = i;
-          console.log(`Emplacement libre trouvé: etat${i}`);
           break;
         }
       }
 
-      console.log('Index d\'emplacement trouvé:', etatIndex);
-
       if (etatIndex === -1) {
-        console.error('Aucun emplacement libre trouvé. États actuels:', {
-          etat1: userData.etat1,
-          etat2: userData.etat2,
-          etat3: userData.etat3
-        });
-        Alert.alert('Erreur', 'Aucun emplacement disponible pour une nouvelle réservation');
+        Alert.alert('Erreur', 'Aucun emplacement disponible');
         return;
       }
 
-      console.log(`Utilisation de l'emplacement etat${etatIndex}`);
-
-      // Trouver le livre dans toutes les collections
       const collections = ['BiblioBooks'];
       let bookFound = false;
 
@@ -189,20 +133,14 @@ const Produit = ({ route, navigation }) => {
         for (const bookDoc of querySnapshot.docs) {
           const bookData = bookDoc.data();
 
-          // Comparer les noms de livres
           if (normalizeString(bookData.name) === normalizedName) {
-            console.log(`Livre trouvé dans ${collectionName}:`, bookData.name, 'Exemplaires:', bookData.exemplaire);
-
-            // Vérifier les exemplaires disponibles
             if (bookData.exemplaire > 0) {
               const batch = writeBatch(db);
 
-              // Mettre à jour le nombre d'exemplaires du livre
               batch.update(bookDoc.ref, {
                 exemplaire: increment(-1)
               });
 
-              // Mettre à jour l'état de réservation de l'utilisateur
               const updateData = {
                 [`etat${etatIndex}`]: 'reserv',
                 [`tabEtat${etatIndex}`]: [
@@ -212,7 +150,7 @@ const Produit = ({ route, navigation }) => {
                   bookData.exemplaire - 1,
                   collectionName,
                   Timestamp.now(),
-                  bookDoc.id // Ajouter l'ID du document pour faciliter les mises à jour futures
+                  bookDoc.id
                 ],
                 docRecent: arrayUnion({
                   cathegorieDoc: cathegorie,
@@ -220,52 +158,21 @@ const Produit = ({ route, navigation }) => {
                 })
               };
 
-              console.log('Données de mise à jour:', updateData);
-
               batch.update(userRef, updateData);
-
               await batch.commit();
-
-              // Ajouter une notification de réservation
-              try {
-                const notificationData = {
-                  id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                  type: 'reservation',
-                  title: 'Réservation confirmée',
-                  message: `Votre réservation pour le livre "${name}" (${cathegorie}) a été confirmée avec succès. Vous pouvez venir le retirer à la bibliothèque pendant les heures d'ouverture.`,
-                  date: Timestamp.now(),
-                  read: false
-                };
-
-                await updateDoc(userRef, {
-                  notifications: arrayUnion(notificationData)
-                });
-
-                console.log('Notification de réservation ajoutée');
-              } catch (notifError) {
-                console.error('Erreur lors de l\'ajout de la notification:', notifError);
-              }
-
-              console.log('Réservation effectuée avec succès:', {
-                name: name,
-                cathegorie: cathegorie,
-                exemplaires_restants: bookData.exemplaire - 1,
-                collection: collectionName,
-                emplacement: `etat${etatIndex}`
-              });
 
               await addNotification(
                   currentUserdata.email,
                   NOTIFICATION_TYPES.RESERVATION,
                   'Réservation confirmée',
-                  `Votre réservation pour "${name}" a été confirmée. Vous pouvez venir récupérer le livre à la bibliothèque.`
+                  `Votre réservation pour "${name}" a été confirmée.`
               );
 
               Alert.alert('Succès', `Livre réservé avec succès!\nEmplacement: ${etatIndex}/3`);
               bookFound = true;
               break;
             } else {
-              Alert.alert('Erreur', 'Aucun exemplaire disponible pour ce livre');
+              Alert.alert('Erreur', 'Aucun exemplaire disponible');
               return;
             }
           }
@@ -274,126 +181,14 @@ const Produit = ({ route, navigation }) => {
       }
 
       if (!bookFound) {
-        console.error('Livre non trouvé:', {
-          name: name,
-          normalized: normalizedName,
-          searchedCollections: collections
-        });
         Alert.alert('Erreur', 'Livre non trouvé dans la base de données');
       }
 
     } catch (error) {
       console.error('Erreur lors de la réservation:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la réservation');
-    }finally {
-      setIsReserving(false);
-    }
-  };
-
-  const reserver = async (userData) => {
-    if (!currentUserdata?.email) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour réserver un livre');
-      return;
-    }
-
-    try {
-      // Déterminer la collection principale basée sur la catégorie
-      let primaryCollection;
-      switch (cathegorie) {
-        case 'Genie Electrique':
-          primaryCollection = 'BiblioGE';
-          break;
-        case 'Genie Informatique':
-          primaryCollection = 'BiblioGI';
-          break;
-        case 'Genie Mecanique':
-          primaryCollection = 'BiblioGM';
-          break;
-        case 'Genie Telecom':
-          primaryCollection = 'BiblioGT';
-          break;
-        default:
-          primaryCollection = 'BiblioInformatique';
-      }
-
-      // D'abord vérifier dans la collection principale
-      let bookRef = doc(db, primaryCollection, name);
-      let bookDoc = await getDoc(bookRef);
-
-      // Si non trouvé, essayer avec le nom original
-      if (!bookDoc.exists()) {
-        const originalDocRef = doc(db, primaryCollection, name);
-        bookDoc = await getDoc(originalDocRef);
-      }
-
-      if (bookDoc.exists()) {
-        const bookData = bookDoc.data();
-        console.log('Livre trouvé dans la collection principale:', {
-          collection: primaryCollection,
-          name: bookDoc.id,
-          exemplaires: bookData.exemplaire
-        });
-        setData([{
-          id: bookDoc.id,
-          ...bookData,
-          collection: primaryCollection
-        }]);
-        if (bookData.description && !desc) {
-          setBookDescription(bookData.description);
-        }
-      } else {
-        // Si non trouvé dans la collection principale, chercher dans les autres
-        const otherCollections = ['BiblioBooks']
-          .filter(c => c !== primaryCollection);
-
-        let found = false;
-        for (const collection of otherCollections) {
-          // Essayer avec le nom normalisé
-          let tempRef = doc(db, collection, normalizedName);
-          let tempSnap = await getDoc(tempRef);
-
-          // Si non trouvé, essayer avec le nom original
-          if (!tempSnap.exists()) {
-            tempRef = doc(db, collection, name);
-            tempSnap = await getDoc(tempRef);
-          }
-
-          if (tempSnap.exists()) {
-            const bookData = tempSnap.data();
-            console.log('Livre trouvé dans une autre collection:', {
-              collection: collection,
-              name: tempSnap.id,
-              exemplaires: bookData.exemplaire
-            });
-            setData([{
-              id: tempSnap.id,
-              ...bookData,
-              collection: collection
-            }]);
-            if (bookData.description && !desc) {
-              setBookDescription(bookData.description);
-            }
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          console.error('Livre non trouvé:', {
-            name: name,
-            normalized: normalizedName,
-            searchedCollections: [primaryCollection, ...otherCollections]
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Erreur lors du chargement du livre:", error);
-      Alert.alert(
-        'Erreur',
-        'Une erreur est survenue lors du chargement des informations du livre.'
-      );
+      Alert.alert('Erreur', 'Une erreur est survenue');
     } finally {
-      setLoader(false);
+      setIsReserving(false);
     }
   };
 
@@ -402,28 +197,35 @@ const Produit = ({ route, navigation }) => {
   }, [exemplaire]);
 
   useEffect(() => {
-    // Charger les commentaires au montage du composant
     const loadComments = async () => {
+      if (!isFirebaseReady || !db || !nomBD) return;
+      
       try {
         const docRef = doc(db, 'BiblioInformatique', nomBD);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const bookData = docSnap.data();
-          if (bookData.commentaire) {
+          if (bookData.commentaire && Array.isArray(bookData.commentaire)) {
             setComment(bookData.commentaire);
+          } else {
+            setComment([]);
           }
+        } else {
+          setComment([]);
         }
       } catch (error) {
-        console.error("Erreur lors du chargement des commentaires:", error);
+        console.error("Erreur chargement commentaires:", error);
+        setComment([]);
       }
     };
 
-    loadComments();
-    fetchSimilarBooks();
-  }, [nomBD]);
+    if (isFirebaseReady && db) {
+      loadComments();
+      fetchSimilarBooks();
+    }
+  }, [nomBD, isFirebaseReady, db]);
 
-  // Fonction pour ajouter à l'historique
   useEffect(() => {
     const addToHistory = async () => {
       if (!currentUserdata?.email || !isFirebaseReady || !db || !name) return;
@@ -456,14 +258,13 @@ const Produit = ({ route, navigation }) => {
           dateVue: Timestamp.now()
         };
 
-        // Vérifier si l'élément existe déjà dans l'historique
         const exists = currentHistory.some(item =>
           item && item.nameDoc === newHistoryItem.nameDoc &&
           item.cathegorieDoc === newHistoryItem.cathegorieDoc
         );
 
         if (!exists) {
-          const newHistory = [newHistoryItem, ...currentHistory].slice(0, 20); // Garder les 20 derniers
+          const newHistory = [newHistoryItem, ...currentHistory].slice(0, 20);
           await updateDoc(userRef, {
             historique: newHistory
           });
@@ -475,23 +276,6 @@ const Produit = ({ route, navigation }) => {
 
     addToHistory();
   }, [currentUserdata?.email, cathegorie, type, image, name, desc, isFirebaseReady, db]);
-
-  // Écouter les changements de l'utilisateur
-  useEffect(() => {
-    if (!currentUserdata?.email || !isFirebaseReady || !db) return;
-
-    const userRef = doc(db, 'BiblioUser', currentUserdata.email);
-    const unsubscribe = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        setDatd(doc.data());
-        setMes(doc.data().name);
-      }
-    }, (error) => {
-      console.error("Erreur lors de l'écoute des changements utilisateur:", error);
-    });
-
-    return () => unsubscribe();
-  }, [currentUserdata?.email, isFirebaseReady, db]);
 
   const handleAddComment = async () => {
     if (!currentUserdata?.email) {
@@ -510,226 +294,94 @@ const Produit = ({ route, navigation }) => {
     }
 
     try {
-      // Récupérer le nom de l'utilisateur depuis BiblioUser
       const userRef = doc(db, 'BiblioUser', currentUserdata.email);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        Alert.alert('Erreur', 'Votre profil utilisateur n\'a pas été trouvé');
+        Alert.alert('Erreur', 'Profil utilisateur non trouvé');
         return;
       }
 
-      const userData = userSnap.data();
-      if (!userData.name) {
-        Alert.alert('Erreur', 'Votre nom n\'est pas défini dans votre profil. Veuillez compléter votre profil avant de laisser un avis.');
-        return;
-      }
-      const userName = userData.name;
+      const userName = userSnap.data().name;
 
-      // Déterminer la collection en fonction de la catégorie
-      let targetCollection = 'BiblioInformatique'; // Par défaut
-      switch (cathegorie) {
-        case 'Genie Electrique':
-          targetCollection = 'BiblioGE';
-          break;
-        case 'Genie Informatique':
-          targetCollection = 'BiblioGI';
-          break;
-        case 'Genie Mecanique':
-          targetCollection = 'BiblioGM';
-          break;
-        case 'Genie Telecom':
-          targetCollection = 'BiblioGT';
-          break;
-      }
+      const collections = {
+        'Genie Electrique': 'BiblioGE',
+        'Genie Informatique': 'BiblioGI',
+        'Genie Mecanique': 'BiblioGM',
+        'Genie Telecom': 'BiblioGT'
+      };
 
+      const targetCollection = collections[cathegorie] || 'BiblioInformatique';
+      const allCollections = ['BiblioGE', 'BiblioGI', 'BiblioGM', 'BiblioGT', 'BiblioInformatique', 'BiblioBooks'];
       let bookFound = false;
-      let bookRef;
-      let bookData;
+      let actualBookRef = null;
 
-      // D'abord chercher dans la collection principale
-      const docRef = doc(db, targetCollection, name);
-      const docSnap = await getDoc(docRef);
+      let bookRef = doc(db, targetCollection, name);
+      let bookSnap = await getDoc(bookRef);
 
-      if (docSnap.exists()) {
-        bookRef = docRef;
-        bookData = docSnap.data();
+      if (bookSnap.exists()) {
+        actualBookRef = bookRef;
         bookFound = true;
       } else {
-        // Si non trouvé, chercher dans toutes les collections
-        const collections = ['BiblioBooks'];
-
-        let bookFound = false;
-        for (const collectionName of collections) {
-          const q = query(collection(db, collectionName));
+        for (const collName of allCollections) {
+          const q = query(collection(db, collName));
           const querySnapshot = await getDocs(q);
-
-          for (const docSnapshot of querySnapshot.docs) {
-            const bookData = docSnapshot.data();
-            if (normalizeString(bookData.name) === normalizedName) {
-              // Livre trouvé, vérifier les exemplaires
-              if (bookData.exemplaire > 0) {
-                const batch = writeBatch(db);
-
-                // Mettre à jour le nombre d'exemplaires
-                const bookRef = docSnapshot.ref;
-                batch.update(bookRef, {
-                  exemplaire: increment(-1)
-                });
-
-                // Mettre à jour l'état de réservation de l'utilisateur
-                const updateData = {
-                  [`etat${etatIndex}`]: 'reserv',
-                  [`tabEtat${etatIndex}`]: [name, cathegorie, image, bookData.exemplaire - 1, collectionName, Timestamp.now()],
-                  docRecent: arrayUnion({
-                    cathegorieDoc: cathegorie,
-                    type: type
-                  })
-                };
-
-                const userRef = doc(db, "BiblioUser", currentUserdata.email);
-                batch.update(userRef, updateData);
-
-                await batch.commit();
-
-                // MISE À JOUR LOCALE IMMÉDIATE
-                setCurrentExemplaire(prev => Math.max(0, prev - 1));
-
-                // Ajouter notification
-                await addNotification(
-                    currentUserdata.email,
-                    NOTIFICATION_TYPES.RESERVATION,
-                    'Réservation confirmée',
-                    `Votre réservation pour "${name}" a été confirmée.`
-                );
-
-                console.log('Réservation effectuée:', {
-                  name: name,
-                  cathegorie: cathegorie,
-                  exemplaires: bookData.exemplaire - 1,
-                  collection: collectionName
-                });
-
-                Alert.alert('Succès', 'Livre réservé avec succès');
-                bookFound = true;
-                break;
-              } else {
-                Alert.alert('Erreur', 'Aucun exemplaire disponible');
-                setCurrentExemplaire(0);
-                return;
-              }
+          
+          for (const docSnap of querySnapshot.docs) {
+            const bookData = docSnap.data();
+            if (bookData && bookData.name && normalizeString(bookData.name) === normalizedName) {
+              actualBookRef = docSnap.ref;
+              bookFound = true;
+              break;
             }
           }
           if (bookFound) break;
         }
       }
 
-      if (!bookFound) {
-        console.error('Livre non trouvé:', {
-          name: name,
-          normalized: normalizedName,
-          searchedCollections: collections
-        });
-        Alert.alert('Erreur', 'Livre non trouvé dans la base de données');
+      if (!bookFound || !actualBookRef) {
+        Alert.alert('Erreur', 'Livre non trouvé');
+        return;
       }
-
-      // Ajouter le commentaire
-      const currentComments = Array.isArray(bookData.commentaire) ? bookData.commentaire : [];
 
       const newComment = {
         nomUser: userName,
-        texte: values.trim(),
         note: valuesNote,
+        texte: values.trim(),
         heure: Timestamp.now(),
         userId: currentUserdata.uid
       };
 
-      // Vérifier si l'utilisateur a déjà commenté
-      const userCommentIndex = currentComments.findIndex(comment => comment.userId === currentUserdata.uid);
-
-      let updatedComments;
-      if (userCommentIndex !== -1) {
-        updatedComments = [...currentComments];
-        updatedComments[userCommentIndex] = newComment;
-      } else {
-        updatedComments = [newComment, ...currentComments];
-      }
-
-      // Mettre à jour le document avec les commentaires mis à jour
-      await updateDoc(bookRef, {
-        commentaire: updatedComments
+      await updateDoc(actualBookRef, {
+        commentaire: arrayUnion(newComment)
       });
 
-      setComment(updatedComments);
+      setComment(prev => Array.isArray(prev) ? [...prev, newComment] : [newComment]);
       setValues("");
       setValuesNote("0");
       setModalComm(false);
 
-      Alert.alert('Succès', 'Votre avis a été ajouté avec succès');
+      Alert.alert("Succès", "Commentaire ajouté !");
     } catch (error) {
-      console.error("Erreur lors de l'ajout du commentaire:", error);
-      if (error.code === 'permission-denied') {
-        Alert.alert('Erreur', "Vous n'avez pas les permissions nécessaires pour ajouter un commentaire.");
-      } else {
-        Alert.alert('Erreur', "Une erreur s'est produite lors de l'ajout de votre commentaire. Veuillez réessayer plus tard.");
-      }
+      console.error("Erreur ajout commentaire:", error);
+      Alert.alert("Erreur", "Impossible d'ajouter le commentaire: " + error.message);
     }
   };
 
-  var date = new Date()
-  date.setDate(date.getDate() + 2)
-
-  function addDays(date, days) {
-    var result = new Date(date)
-    result.setDate(result.getDate() + days)
-    return result
-  }
-
-  function voirArticle(name, cathegorie, image, desc, exemplaire) {
-    navigation.navigate('PageBiblio', {
-      name: name,
-      cathegorie: cathegorie,
-      image: image,
-      desc: desc,
-      exemplaire: exemplaire
-    })
-  }
-
-  const voirComm = (name, cathegorie, image, desc, exemplaire) => {
-    navigation.navigate('PageBiblio', {
-      name: name,
-      cathegorie: cathegorie,
-      image: image,
-      desc: desc,
-      exemplaire: exemplaire
-    })
-  }
-
-  // Fonction pour calculer la similarité entre deux chaînes
   const calculateSimilarity = (str1, str2) => {
     if (!str1 || !str2) return 0;
     const s1 = normalizeString(str1).split(' ').filter(Boolean);
     const s2 = normalizeString(str2).split(' ').filter(Boolean);
-
     if (s1.length === 0 || s2.length === 0) return 0;
-
-    // Compter les mots communs
     const commonWords = s1.filter(word => s2.includes(word));
-
-    // Calculer le score de similarité (0 à 1)
     return commonWords.length / Math.max(s1.length, s2.length);
   };
 
   const fetchSimilarBooks = async () => {
-    if (!name) {
-      console.log('Nom du livre manquant pour la recherche');
-      return;
-    }
-
+    if (!name || !isFirebaseReady || !db) return;
     setLoadingSimilar(true);
 
     try {
-      // Récupérer les livres de toutes les collections pertinentes
       const collections = ['BiblioGE', 'BiblioGI', 'BiblioGM', 'BiblioGT', 'BiblioInformatique'];
       let allBooks = [];
 
@@ -754,53 +406,41 @@ const Produit = ({ route, navigation }) => {
             }
           });
         } catch (error) {
-          console.error(`Erreur lors de la lecture de ${collectionName}:`, error);
+          console.error(`Erreur lecture ${collectionName}:`, error);
         }
       }
 
-      // Calculer les scores de similarité pour chaque livre
       const scoredBooks = allBooks.map(book => ({
         ...book,
-        score: calculateSimilarity(name, book.title) * 0.6 + // Similarité du titre (60%)
-               (book.category === cathegorie ? 0.4 : 0) // Même catégorie (40%)
+        score: calculateSimilarity(name, book.title) * 0.6 + (book.category === cathegorie ? 0.4 : 0)
       }));
 
-      // Trier par score et prendre les 5 meilleurs
       const recommendations = scoredBooks
         .sort((a, b) => b.score - a.score)
-        .filter(book => book.score > 0.1) // Garder uniquement les livres avec un score minimum
+        .filter(book => book.score > 0.1)
         .slice(0, 5);
 
-      console.log('Livres similaires trouvés:', recommendations.length);
-
       setSimilarBooks(recommendations);
-
-      if (recommendations.length === 0) {
-        console.log('Aucune recommandation trouvée pour:', name);
-      }
-
     } catch (error) {
-      console.error('Erreur lors de la recherche de livres similaires:', error);
+      console.error('Erreur recherche livres similaires:', error);
       setSimilarBooks([]);
     } finally {
       setLoadingSimilar(false);
     }
   };
 
-  // Calculer la note moyenne
   const calculateAverageRating = () => {
-    if (!comment || comment.length === 0) return 0;
-    const sum = comment.reduce((acc, curr) => acc + Number(curr.note), 0);
+    if (!comment || !Array.isArray(comment) || comment.length === 0) return 0;
+    const sum = comment.reduce((acc, curr) => acc + Number(curr?.note || 0), 0);
     return (sum / comment.length).toFixed(1);
   };
 
-  // Calculer le nombre d'avis par note
   const calculateRatingDistribution = () => {
     const distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
-    if (!comment || comment.length === 0) return distribution;
+    if (!comment || !Array.isArray(comment) || comment.length === 0) return distribution;
 
     comment.forEach(c => {
-      const note = Number(c.note);
+      const note = Number(c?.note || 0);
       if (note >= 1 && note <= 5) {
         distribution[note] = (distribution[note] || 0) + 1;
       }
@@ -808,10 +448,6 @@ const Produit = ({ route, navigation }) => {
     return distribution;
   };
 
-  // Ajouter un state pour gérer l'expansion des commentaires
-  const [expandedComments, setExpandedComments] = useState({});
-
-  // Fonction pour basculer l'expansion d'un commentaire
   const toggleCommentExpansion = (commentId) => {
     setExpandedComments(prev => ({
       ...prev,
@@ -829,9 +465,6 @@ const Produit = ({ route, navigation }) => {
           <View style={styles.slide2}>
             <Image style={{ width: WIDTH * 0.8, height: HEIGHT * 0.5, resizeMode: 'contain' }} source={require('../../../assets/ensp.png')} />
           </View>
-          {/* <View style={styles.slide3}>
-            <Image style={{ width: WIDTH * 0.8, height: HEIGHT * 0.5, resizeMode: 'contain' }} source={require('../../../assets/image/sold2.jpg')} />
-          </View>*/}
         </Swiper>
 
         <View style={styles.bookDetailsContainer}>
@@ -864,39 +497,23 @@ const Produit = ({ route, navigation }) => {
               disabled={currentExemplaire === 0 || isReserving}
           >
             <Text style={styles.empruntButtonText}>
-              {isReserving
-                  ? 'Réservation...'
-                  : currentExemplaire === 0
-                      ? 'Indisponible'
-                      : 'Réserver'
-              }
+              {isReserving ? 'Réservation...' : currentExemplaire === 0 ? 'Indisponible' : 'Réserver'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/** DESCRIPTION */}
         <View style={styles.descriptionContainer}>
           <View style={styles.descriptionHeader}>
             <Text style={styles.descriptionTitle}>Description</Text>
-            <TouchableOpacity
-              onPress={() => setModalDescription(true)}
-              style={styles.seeMoreButton}
-            >
+            <TouchableOpacity onPress={() => setModalDescription(true)} style={styles.seeMoreButton}>
               <Text style={styles.seeMoreText}>Voir plus</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.descriptionText}>
-            {bookDescription ?
-              (bookDescription.length > 150 ?
-                `${bookDescription.slice(0, 150)}...` :
-                bookDescription
-              ) :
-              "Aucune description disponible"
-            }
+            {bookDescription ? (bookDescription.length > 150 ? `${bookDescription.slice(0, 150)}...` : bookDescription) : "Aucune description disponible"}
           </Text>
         </View>
 
-        {/** EMPLACEMENT */}
         <View style={styles.locationContainer}>
           <Text style={styles.locationTitle}>Emplacement</Text>
           <View style={styles.locationDetails}>
@@ -912,14 +529,10 @@ const Produit = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/** NOTES ET AVIS */}
         <View style={styles.reviewsContainer}>
           <View style={styles.reviewsHeader}>
             <Text style={styles.reviewsTitle}>Notes et avis</Text>
-            <TouchableOpacity
-              style={styles.addReviewButton}
-              onPress={() => setModalComm(true)}
-            >
+            <TouchableOpacity style={styles.addReviewButton} onPress={() => setModalComm(true)}>
               <Text style={styles.addReviewButtonText}>Donner mon avis</Text>
             </TouchableOpacity>
           </View>
@@ -934,13 +547,13 @@ const Produit = ({ route, navigation }) => {
                   </Text>
                 ))}
               </View>
-              <Text style={styles.totalReviews}>{comment.length} avis</Text>
+              <Text style={styles.totalReviews}>{comment?.length || 0} avis</Text>
             </View>
 
             <View style={styles.ratingBarsContainer}>
               {[5, 4, 3, 2, 1].map((rating) => {
                 const count = calculateRatingDistribution()[rating] || 0;
-                const percentage = comment.length > 0 ? (count / comment.length) * 100 : 0;
+                const percentage = (comment?.length || 0) > 0 ? (count / comment.length) * 100 : 0;
                 return (
                   <View key={rating} style={styles.ratingBarRow}>
                     <Text style={styles.ratingNumber}>{rating}</Text>
@@ -954,41 +567,35 @@ const Produit = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* Liste des commentaires récents */}
           <View style={styles.recentReviews}>
             <Text style={styles.recentReviewsTitle}>Commentaires récents</Text>
-            {comment && comment.length > 0 ? (
+            {comment && Array.isArray(comment) && comment.length > 0 ? (
               <>
                 {comment.slice(0, 3).map((review, index) => (
                   <View key={index} style={styles.reviewCard}>
                     <View style={styles.reviewHeader}>
                       <View style={styles.reviewerInfo}>
-                        <Text style={styles.reviewerName}>{review.nomUser}</Text>
+                        <Text style={styles.reviewerName}>{review?.nomUser || 'Utilisateur'}</Text>
                         <Text style={styles.reviewDate}>
-                          {review.heure?.seconds ?
-                            new Date(review.heure.seconds * 1000).toLocaleDateString() :
-                            new Date().toLocaleDateString()}
+                          {review?.heure?.seconds ? new Date(review.heure.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString()}
                         </Text>
                       </View>
                       <View style={styles.reviewRating}>
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Text key={star} style={styles.reviewStarIcon}>
-                            {star <= Number(review.note) ? '★' : '☆'}
+                            {star <= Number(review?.note || 0) ? '★' : '☆'}
                           </Text>
                         ))}
                       </View>
                     </View>
                     <View>
                       <Text style={styles.reviewText}>
-                        {expandedComments[index] || review.texte.length <= 100
-                          ? review.texte
-                          : review.texte.slice(0, 100) + '...'}
+                        {expandedComments[index] || (review?.texte || '').length <= 100
+                          ? (review?.texte || '')
+                          : (review?.texte || '').slice(0, 100) + '...'}
                       </Text>
-                      {review.texte.length > 100 && (
-                        <TouchableOpacity
-                          onPress={() => toggleCommentExpansion(index)}
-                          style={styles.seeMoreButton}
-                        >
+                      {(review?.texte || '').length > 100 && (
+                        <TouchableOpacity onPress={() => toggleCommentExpansion(index)} style={styles.seeMoreButton}>
                           <Text style={styles.seeMoreText}>
                             {expandedComments[index] ? 'Voir moins' : 'Voir plus'}
                           </Text>
@@ -1004,32 +611,27 @@ const Produit = ({ route, navigation }) => {
                       <View key={index} style={styles.reviewCard}>
                         <View style={styles.reviewHeader}>
                           <View style={styles.reviewerInfo}>
-                            <Text style={styles.reviewerName}>{review.nomUser}</Text>
+                            <Text style={styles.reviewerName}>{review?.nomUser || 'Utilisateur'}</Text>
                             <Text style={styles.reviewDate}>
-                              {review.heure?.seconds ?
-                                new Date(review.heure.seconds * 1000).toLocaleDateString() :
-                                new Date().toLocaleDateString()}
+                              {review?.heure?.seconds ? new Date(review.heure.seconds * 1000).toLocaleDateString() : new Date().toLocaleDateString()}
                             </Text>
                           </View>
                           <View style={styles.reviewRating}>
                             {[1, 2, 3, 4, 5].map((star) => (
                               <Text key={star} style={styles.reviewStarIcon}>
-                                {star <= Number(review.note) ? '★' : '☆'}
+                                {star <= Number(review?.note || 0) ? '★' : '☆'}
                               </Text>
                             ))}
                           </View>
                         </View>
-                        <Text style={styles.reviewText}>{review.texte}</Text>
+                        <Text style={styles.reviewText}>{review?.texte || ''}</Text>
                       </View>
                     ))}
                   </View>
                 )}
 
                 {comment.length > 3 && (
-                  <TouchableOpacity
-                    style={styles.seeAllReviewsButton}
-                    onPress={() => setShowAllComments(!showAllComments)}
-                  >
+                  <TouchableOpacity style={styles.seeAllReviewsButton} onPress={() => setShowAllComments(!showAllComments)}>
                     <Text style={styles.seeAllReviewsText}>
                       {showAllComments ? 'Voir moins d\'avis' : `Voir ${comment.length - 3} avis supplémentaires`}
                     </Text>
@@ -1042,7 +644,6 @@ const Produit = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/**LIVRES SIMILAIRES */}
         <View style={styles.similarBooksContainer}>
           <View style={styles.similarBooksHeader}>
             <Text style={styles.similarBooksTitle}>Livres similaires</Text>
@@ -1059,19 +660,11 @@ const Produit = ({ route, navigation }) => {
                     name: book.title,
                     cathegorie: book.category,
                     image: book.image,
-                    desc: book.desc,
-                    exemplaire: book.exemplaire,
-                    nomBD: book.nomBD,
-                    type: book.type,
-                    salle: book.salle || '',
-                    etagere: book.etagere || ''
+                    desc: book.description,
+                    exemplaire: book.exemplaire
                   })}
                 >
-                  <Image
-                    source={{ uri: book.image }}
-                    style={styles.similarBookImage}
-                    defaultSource={require('../../../assets/biblio/math.jpg')}
-                  />
+                  <Image source={{ uri: book.image }} style={styles.similarBookImage} defaultSource={require('../../../assets/biblio/math.jpg')} />
                   <View style={styles.similarBookInfo}>
                     <Text style={styles.similarBookTitle} numberOfLines={2}>{book.title}</Text>
                     <Text style={styles.similarBookCategory}>{book.category}</Text>
@@ -1086,60 +679,26 @@ const Produit = ({ route, navigation }) => {
 
       </ScrollView>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalComm}
-        onRequestClose={() => setModalComm(false)}
-      >
+      <Modal animationType="slide" transparent={true} visible={modalComm} onRequestClose={() => setModalComm(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Donner mon avis</Text>
-
             <View style={styles.ratingInput}>
               <Text style={styles.ratingLabel}>Note :</Text>
               <View style={styles.starRatingContainer}>
                 {[1, 2, 3, 4, 5].map((rating) => (
-                  <TouchableOpacity
-                    key={rating}
-                    onPress={() => setValuesNote(rating.toString())}
-                  >
-                    <Text style={[
-                      styles.starRatingIcon,
-                      { color: rating <= parseInt(valuesNote) ? '#FFD700' : '#ddd' }
-                    ]}>
-                      ★
-                    </Text>
+                  <TouchableOpacity key={rating} onPress={() => setValuesNote(rating.toString())}>
+                    <Text style={[styles.starRatingIcon, { color: rating <= parseInt(valuesNote) ? '#FFD700' : '#ddd' }]}>★</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
-
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Écrivez votre avis ici..."
-              multiline
-              numberOfLines={4}
-              value={values}
-              onChangeText={setValues}
-            />
-
+            <TextInput style={styles.commentInput} placeholder="Écrivez votre avis ici..." multiline numberOfLines={4} value={values} onChangeText={setValues} />
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setModalComm(false);
-                  setValues('');
-                  setValuesNote('0');
-                }}
-              >
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => { setModalComm(false); setValues(''); setValuesNote('0'); }}>
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
-                onPress={handleAddComment}
-              >
+              <TouchableOpacity style={[styles.modalButton, styles.submitButton]} onPress={handleAddComment}>
                 <Text style={styles.submitButtonText}>Publier</Text>
               </TouchableOpacity>
             </View>
@@ -1147,33 +706,24 @@ const Produit = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      <Modal
-        animationType='slide'
-        transparent={true}
-        visible={modalDescription}
-        onRequestClose={() => setModalDescription(false)}
-      >
+      <Modal animationType='slide' transparent={true} visible={modalDescription} onRequestClose={() => setModalDescription(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Description complète</Text>
             <ScrollView style={styles.modalScrollView}>
-              <Text style={styles.modalDescriptionText}>
-                {bookDescription || "Aucune description disponible"}
-              </Text>
+              <Text style={styles.modalDescriptionText}>{bookDescription || "Aucune description disponible"}</Text>
             </ScrollView>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setModalDescription(false)}
-            >
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setModalDescription(false)}>
               <Text style={styles.modalCloseButtonText}>Fermer</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
     </React.Fragment>
   )
 }
+
+
 
 const styles = StyleSheet.create({
   wrapper: {
