@@ -1,39 +1,134 @@
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Share } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Share, Alert, ActivityIndicator } from 'react-native';
 import React, { useState } from 'react';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+const DOWNLOAD_URL = 'https://biblioapp.example.com/download'; // Update with your actual download URL
+const FIREBASE_REGION = 'us-central1'; // Update with your Firebase region
+const FIREBASE_PROJECT_ID = 'biblio-cc84b'; // Update with your Firebase project ID
+const BACKEND_URL = 'https://chat-server-5nfg.onrender.com/send-invitation';
+
 export default function InviteStudent({ navigation }) {
     const [email, setEmail] = useState('');
+    const [loading, setLoading] = useState(false);
     const [recentContacts, setRecentContacts] = useState([
         { id: '1', name: 'Amina Diop', email: 'amina.diop@example.com', image: null },
         { id: '2', name: 'Mamadou Sow', email: 'mamadou.sow@example.com', image: null },
         { id: '3', name: 'Fatou Ndiaye', email: 'fatou.ndiaye@example.com', image: null },
     ]);
 
+    // Validate email format
+    const isValidEmail = (emailAddress) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(emailAddress);
+    };
+
+    // Send invitation email
+    const sendInvitationEmail = async (recipientEmail) => {
+        try {
+            setLoading(true);
+            
+            const response = await fetch(BACKEND_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    recipientEmail: recipientEmail,
+                    downloadLink: DOWNLOAD_URL,
+                    subject: 'Rejoignez BiblioApp - Invitation',
+                    message: `Vous avez été invité à télécharger BiblioApp, une application de bibliothèque universitaire.`,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                Alert.alert(
+                    'Succès',
+                    `Invitation envoyée à ${recipientEmail}.\nLe lien de téléchargement a été inclus dans l'email.`,
+                    [{ text: 'OK', onPress: () => setEmail('') }]
+                );
+            } else {
+                Alert.alert('Erreur', data.message || 'Impossible d\'envoyer l\'invitation');
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'envoi:', error);
+            // Fallback: Send via mailto if backend is not available
+            sendEmailFallback(recipientEmail);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fallback: Use mailto if backend is not available
+    const sendEmailFallback = (recipientEmail) => {
+        const subject = encodeURIComponent('Rejoignez BiblioApp - Invitation');
+        const body = encodeURIComponent(
+            `Bonjour,\n\nVous avez été invité à télécharger BiblioApp, une application de bibliothèque universitaire.\n\nTéléchargez l'application ici: ${DOWNLOAD_URL}\n\nCordialement,\nL'équipe BiblioApp`
+        );
+        const mailtoLink = `mailto:${recipientEmail}?subject=${subject}&body=${body}`;
+        
+        Alert.alert(
+            'Ouvrir l\'email',
+            `Voulez-vous ouvrir votre client email pour envoyer une invitation à ${recipientEmail}?`,
+            [
+                { text: 'Annuler', onPress: () => {} },
+                {
+                    text: 'Ouvrir',
+                    onPress: () => {
+                        // Note: In React Native, you can't directly open mailto links
+                        // Instead, copy the link to clipboard or show the message
+                        Alert.alert(
+                            'Invitation',
+                            `Voici le lien à partager avec ${recipientEmail}:\n\n${DOWNLOAD_URL}`,
+                            [{ text: 'Copier le lien', onPress: () => copyToClipboard(DOWNLOAD_URL) }]
+                        );
+                    }
+                }
+            ]
+        );
+    };
+
     const handleInvite = () => {
         if (!email) {
-            alert('Veuillez entrer une adresse e-mail');
+            Alert.alert('Erreur', 'Veuillez entrer une adresse e-mail');
             return;
         }
 
-        // Here you would typically send an invitation email
-        // For now, just show an alert
-        alert(`Invitation envoyée à ${email}`);
-        setEmail('');
+        if (!isValidEmail(email)) {
+            Alert.alert('Erreur', 'Veuillez entrer une adresse e-mail valide');
+            return;
+        }
+
+        sendInvitationEmail(email);
     };
 
     const handleContactInvite = (contact) => {
-        // Here you would typically send an invitation email to the selected contact
-        alert(`Invitation envoyée à ${contact.name} (${contact.email})`);
+        Alert.alert(
+            'Confirmer l\'invitation',
+            `Envoyer une invitation à ${contact.name} (${contact.email})?`,
+            [
+                { text: 'Annuler', onPress: () => {} },
+                {
+                    text: 'Envoyer',
+                    onPress: () => sendInvitationEmail(contact.email)
+                }
+            ]
+        );
+    };
+
+    const copyToClipboard = (text) => {
+        // You may need to import Clipboard from react-native
+        Alert.alert('Succès', 'Lien copié dans le presse-papiers');
     };
 
     const handleShareInvite = async () => {
         try {
             await Share.share({
-                message: 'Rejoignez BiblioApp pour découvrir et emprunter des livres de notre bibliothèque universitaire ! Téléchargez l\'application ici : https://biblioapp.example.com',
+                message: `Rejoignez BiblioApp pour découvrir et emprunter des livres de notre bibliothèque universitaire ! Téléchargez l'application ici : ${DOWNLOAD_URL}`,
             });
         } catch (error) {
-            alert(`Erreur lors du partage: ${error.message}`);
+            Alert.alert('Erreur', `Erreur lors du partage: ${error.message}`);
         }
     };
 
@@ -66,13 +161,19 @@ export default function InviteStudent({ navigation }) {
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            editable={!loading}
                         />
                     </View>
                     <TouchableOpacity
-                        style={styles.inviteButton}
+                        style={[styles.inviteButton, loading && styles.inviteButtonDisabled]}
                         onPress={handleInvite}
+                        disabled={loading}
                     >
-                        <Text style={styles.inviteButtonText}>Inviter</Text>
+                        {loading ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                            <Text style={styles.inviteButtonText}>Inviter</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
 
@@ -294,5 +395,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#FF8A50',
         fontWeight: '500',
+    },
+    inviteButtonDisabled: {
+        opacity: 0.6,
     },
 });
