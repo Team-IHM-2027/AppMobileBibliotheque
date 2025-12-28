@@ -23,6 +23,7 @@ const NewNav = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('NewNav onAuthStateChanged fired, user:', user);
       if (user) {
         setCurrentUserNewNav(user);
         const userDocRef = doc(db, 'BiblioUser', user.email);

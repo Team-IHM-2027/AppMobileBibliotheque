@@ -5,7 +5,7 @@ import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-ic
 const DOWNLOAD_URL = 'https://biblioapp.example.com/download'; // Update with your actual download URL
 const FIREBASE_REGION = 'us-central1'; // Update with your Firebase region
 const FIREBASE_PROJECT_ID = 'biblio-cc84b'; // Update with your Firebase project ID
-const BACKEND_URL = 'https://chat-server-5nfg.onrender.com/send-invitation';
+const BACKEND_URL = 'https://192.168.43.78:3000/send-invitation';
 
 export default function InviteStudent({ navigation }) {
     const [email, setEmail] = useState('');

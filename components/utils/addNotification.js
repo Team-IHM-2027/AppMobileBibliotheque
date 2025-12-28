@@ -1,4 +1,4 @@
-import { doc, updateDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '../../config';
 
 /**
@@ -17,7 +17,7 @@ export const addNotification = async (userEmail, type, title, message) => {
             type: type,
             title: title,
             message: message,
-            date: serverTimestamp(),
+            date: Timestamp.now(),
             read: false
         };
 
