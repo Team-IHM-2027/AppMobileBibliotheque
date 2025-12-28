@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "ingy",
+    "slug": "ingy-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/ensp.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/ensp.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/ensp.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.franck_97.ingyapp"
+    },
+    "web": {
+      "favicon": "./assets/iconbibli.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a3673684-51ab-4809-a42d-dd38395ed87c"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset"
+    ],
+    "newArchEnabled": true
+  }
+}
