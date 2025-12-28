@@ -22,7 +22,8 @@ const NewNav = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('NewNav onAuthStateChanged fired, user:', user);
       if (user) {
         // Reload user to get fresh emailVerified status
         await user.reload();

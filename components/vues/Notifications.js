@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { doc, onSnapshot, updateDoc, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayRemove, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '../../config';
 import { UserContext } from '../context/UserContext';
+import WebSocketService from '../utils/WebSocketService';
 
 export default function Notifications({ navigation }) {
     const { currentUserNewNav } = useContext(UserContext);
@@ -14,6 +15,16 @@ export default function Notifications({ navigation }) {
 
     useEffect(() => {
         fetchNotifications();
+        
+        // Initialize WebSocket for real-time approval notifications
+        if (currentUserNewNav?.email) {
+            initializeWebSocket(currentUserNewNav.email);
+        }
+
+        return () => {
+            // Cleanup WebSocket on unmount
+            WebSocketService.disconnect();
+        };
     }, [currentUserNewNav?.email]);
 
     const fetchNotifications = () => {
@@ -51,6 +62,63 @@ export default function Notifications({ navigation }) {
         } catch (error) {
             console.error('Erreur lors de l\'initialisation:', error);
             setLoading(false);
+        }
+    };
+
+    /**
+     * Initialize WebSocket connection for real-time approvals
+     */
+    const initializeWebSocket = (userId) => {
+        try {
+            // Connect to WebSocket server
+            WebSocketService.connect(userId);
+
+            // Handle approval notifications
+            WebSocketService.on('approval', async (data) => {
+                console.log('Approval received:', data);
+                
+                // Create approval notification
+                const approvalNotification = {
+                    id: `notif_approval_${Date.now()}`,
+                    type: 'reservation_approved',
+                    title: 'Réservation approuvée',
+                    message: `Votre réservation pour le livre "${data.bookTitle}" a été approuvée par l'administrateur. Le livre est prêt à être retiré.`,
+                    date: Timestamp.now(),
+                    read: false,
+                    bookId: data.bookId,
+                    bookTitle: data.bookTitle,
+                };
+
+                // Add notification to Firestore
+                try {
+                    const userRef = doc(db, 'BiblioUser', userId);
+                    await updateDoc(userRef, {
+                        notifications: arrayUnion(approvalNotification)
+                    });
+                    
+                    // Show alert to user
+                    Alert.alert(
+                        'Réservation approuvée ✓',
+                        `Le livre "${data.bookTitle}" est prêt à être retiré!`,
+                        [{ text: 'OK' }]
+                    );
+                } catch (error) {
+                    console.error('Erreur lors de l\'ajout de la notification:', error);
+                }
+            });
+
+            // Handle disconnection
+            WebSocketService.on('disconnected', () => {
+                console.log('WebSocket disconnected');
+            });
+
+            // Handle errors
+            WebSocketService.on('error', (error) => {
+                console.error('WebSocket error:', error);
+            });
+
+        } catch (error) {
+            console.error('Error initializing WebSocket:', error);
         }
     };
 
@@ -143,6 +211,8 @@ export default function Notifications({ navigation }) {
         switch (type) {
             case 'reservation':
                 return <Ionicons name="bookmark-outline" size={24} color="#FF8A50" />;
+            case 'reservation_approved':
+                return <Ionicons name="checkmark-circle" size={24} color="#34C759" />;
             case 'emprunt':
                 return <Ionicons name="book-outline" size={24} color="#30B0C7" />;
             case 'retour':

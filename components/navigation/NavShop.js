@@ -1,6 +1,6 @@
 import {createStackNavigator} from '@react-navigation/stack'
-import React from 'react'
-const Stack = createStackNavigator()
+import React, { useEffect } from 'react'
+import { useNavigation } from '@react-navigation/native'
 
 import VueUn from '../vues/VueUn'
 import Cathegorie from '../composants/message/Cathegorie'
@@ -21,9 +21,28 @@ const screenOptions = {
      headerShown: false,
 }
 
-const NavShop = () => (
-    <Stack.Navigator initialRouteName='ScreenVueUn' screenOptions={screenOptions}>
-         <Stack.Screen name='ScreenVueUn' component={ScreenVueUn} />
+const Stack = createStackNavigator()
+
+const NavShop = () => {
+     const navigation = useNavigation();
+
+     useEffect(() => {
+          const unsubscribe = navigation.addListener('tabPress', (e) => {
+               // If the tab is already focused, reset the stack to the initial screen
+               if (navigation.isFocused()) {
+                    navigation.reset({
+                         index: 0,
+                         routes: [{ name: 'ScreenVueUn' }],
+                    });
+               }
+          });
+
+          return unsubscribe;
+     }, [navigation]);
+
+     return (
+     <Stack.Navigator initialRouteName='ScreenVueUn' screenOptions={screenOptions}>
+           <Stack.Screen name='ScreenVueUn' component={ScreenVueUn} />
          <Stack.Screen name='VueUn' component={VueUn} />
          <Stack.Screen name='Panier' component={Panier} />
          <Stack.Screen name='Produit' component={Produit} />
@@ -48,6 +67,7 @@ const NavShop = () => (
              }}
          />
     </Stack.Navigator>
-)
+     )
+}
 
 export default NavShop

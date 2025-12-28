@@ -21,6 +21,7 @@ const NavApp = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('NavApp onAuthStateChanged fired, user:', user);
       setCurrentUserdata(user);
       setLoadingData(false);
     });
